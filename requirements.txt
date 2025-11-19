@@ -16,3 +16,11 @@ requests
 ollama
 langdetect
 google-generativeai>=0.8.0
+
+# Admin UI dependencies
+flask>=3.0.0
+werkzeug>=3.0.0
+
+# Integration dependencies
+sentence-transformers>=2.2.0
+pandas>=2.0.0

@@ -43,9 +43,20 @@ This repository provides a production-ready system where your documentation powe
 - `sql/prospects.sql` — CRM schema for prospects, interactions, campaigns
 - `examples/sdr_workflow.py` — complete demo workflow
 
+### 🆕 CRM & Knowledge Base Integrations
+
+- `app/typeform_integration.py` — **OAuth 2.0 + auto-ingest form responses to KB**
+- `app/hubspot_integration.py` — **OAuth 2.0 + contact sync + call logging**
+- `app/salesforce_integration.py` — **OAuth 2.0 + lead/contact sync + activity logging**
+- `app/campaign_manager.py` — **Campaign triggers + automated prospect importing**
+- `app/admin_ui.py` — **Web UI for uploads, OAuth, and campaign management**
+- `sql/integrations.sql` — Integration schema (OAuth tokens, CRM sync, campaigns)
+- `examples/integration_workflow.py` — Complete integration examples
+
 📖 See [`docs/KNOWLEDGE_BASE_INTEGRATION.md`](docs/KNOWLEDGE_BASE_INTEGRATION.md) for how KB powers SDR.  
 📖 See [`docs/GEMINI_INTEGRATION.md`](docs/GEMINI_INTEGRATION.md) for Gemini File API setup.  
-📖 See [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) for full SDR agent documentation.
+📖 See [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) for full SDR agent documentation.  
+📖 See [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) for **CRM integration guide**.
 
 ---
 
@@ -81,6 +92,7 @@ pip install -r requirements.txt
 # 3. Create CRM tables
 export DATABASE_URL='postgresql+psycopg://rag:ragpw@localhost:5433/ragdb'
 psql $DATABASE_URL -f sql/prospects.sql
+psql $DATABASE_URL -f sql/integrations.sql  # For CRM integrations
 
 # 4. Run demo workflow (imports 3 leads, researches, drafts outreach)
 python examples/sdr_workflow.py
@@ -89,7 +101,30 @@ python examples/sdr_workflow.py
 python examples/sdr_workflow.py --chat
 ```
 
-📖 See [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) for complete guide.
+### Option C: 🆕 Admin UI + CRM Integrations
+
+```bash
+# 1. Follow Option B steps 1-3 above
+
+# 2. Set integration environment variables
+export TYPEFORM_CLIENT_ID=your_typeform_client_id
+export TYPEFORM_CLIENT_SECRET=your_typeform_secret
+export HUBSPOT_CLIENT_ID=your_hubspot_client_id
+export HUBSPOT_CLIENT_SECRET=your_hubspot_secret
+export SALESFORCE_CLIENT_ID=your_salesforce_client_id
+export SALESFORCE_CLIENT_SECRET=your_salesforce_secret
+export FLASK_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+
+# 3. Start Admin UI
+python app/admin_ui.py
+# Visit http://localhost:8000 for:
+# - Document uploads to knowledge base
+# - OAuth setup (Typeform, HubSpot, Salesforce)
+# - Campaign management with CRM triggers
+```
+
+📖 See [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) for complete integration setup.  
+📖 See [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) for complete agent guide.
 
 ---
 
@@ -113,6 +148,7 @@ A GitHub Actions workflow [`.github/workflows/integration.yml`](.github/workflow
 
 - [`docs/KNOWLEDGE_BASE_INTEGRATION.md`](docs/KNOWLEDGE_BASE_INTEGRATION.md) — How KB powers SDR operations
 - [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) — Complete SDR agent guide
+- [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) — **🆕 Typeform/HubSpot/Salesforce integration guide**
 - [`docs/GEMINI_INTEGRATION.md`](docs/GEMINI_INTEGRATION.md) — Gemini File API setup and usage
 - [`docs/BUILDING_YOUR_KB.md`](docs/BUILDING_YOUR_KB.md) — Step-by-step knowledge base setup
 - [`docs/GEMINI_IMPLEMENTATION.md`](docs/GEMINI_IMPLEMENTATION.md) — Implementation summary
@@ -123,6 +159,8 @@ A GitHub Actions workflow [`.github/workflows/integration.yml`](.github/workflow
 
 - **Add more knowledge:** Ingest your product docs, case studies, FAQs
 - **Configure agents:** Customize outreach templates and research depth
+- **🆕 Connect CRMs:** Set up Typeform, HubSpot, or Salesforce integrations
+- **🆕 Create campaigns:** Build automated prospect import campaigns with triggers
 - **Integrate Gemini:** Enable multimodal RAG for PDFs with images
 - **Production deployment:** Add secret redaction, monitoring, and rate limiting
 
