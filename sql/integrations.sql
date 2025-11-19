@@ -4,16 +4,19 @@
 -- OAuth Tokens Table
 CREATE TABLE IF NOT EXISTS oauth_tokens (
     id SERIAL PRIMARY KEY,
-    provider VARCHAR(50) UNIQUE NOT NULL,  -- 'typeform', 'hubspot', 'salesforce'
+    user_id VARCHAR(255) NOT NULL,  -- User identifier
+    provider VARCHAR(50) NOT NULL,  -- 'typeform', 'hubspot', 'salesforce', 'google_calendar', 'outlook_calendar'
     access_token TEXT NOT NULL,
     refresh_token TEXT,
     expires_at TIMESTAMP,
     scope TEXT,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, provider)
 );
 
+CREATE INDEX idx_oauth_tokens_user ON oauth_tokens(user_id);
 CREATE INDEX idx_oauth_tokens_provider ON oauth_tokens(provider);
 CREATE INDEX idx_oauth_tokens_expires_at ON oauth_tokens(expires_at);
 
@@ -168,15 +171,41 @@ CREATE TABLE IF NOT EXISTS integration_settings (
 
 CREATE INDEX idx_integration_settings_provider ON integration_settings(provider);
 
+-- Calendar Events Table (tracks booked meetings)
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,  -- User who owns the calendar
+    provider VARCHAR(50) NOT NULL,  -- 'google', 'outlook'
+    event_id VARCHAR(255) NOT NULL,  -- Provider's event ID
+    title VARCHAR(255) NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    attendees JSONB DEFAULT '[]',  -- Array of attendee emails
+    location TEXT,
+    description TEXT,
+    conferencing_link TEXT,
+    status VARCHAR(50) DEFAULT 'confirmed',  -- 'confirmed', 'cancelled', 'tentative'
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, provider, event_id)
+);
+
+CREATE INDEX idx_calendar_events_user ON calendar_events(user_id);
+CREATE INDEX idx_calendar_events_provider ON calendar_events(provider);
+CREATE INDEX idx_calendar_events_start_time ON calendar_events(start_time);
+CREATE INDEX idx_calendar_events_status ON calendar_events(status);
+
 -- Insert default integration settings
 INSERT INTO integration_settings (provider, is_enabled, config) VALUES
     ('typeform', false, '{"auto_ingest": true}'),
     ('hubspot', false, '{"auto_sync": false, "sync_interval": "1 hour"}'),
-    ('salesforce', false, '{"auto_sync": false, "sync_interval": "1 hour"}')
+    ('salesforce', false, '{"auto_sync": false, "sync_interval": "1 hour"}'),
+    ('google_calendar', false, '{"default_duration": 30, "buffer_minutes": 15}'),
+    ('outlook_calendar', false, '{"default_duration": 30, "buffer_minutes": 15}')
 ON CONFLICT (provider) DO NOTHING;
 
 -- Comments for documentation
-COMMENT ON TABLE oauth_tokens IS 'OAuth 2.0 tokens for CRM and form integrations';
+COMMENT ON TABLE oauth_tokens IS 'OAuth 2.0 tokens for CRM, calendar, and form integrations';
 COMMENT ON TABLE crm_sync_metadata IS 'Tracks synced prospects from external CRMs';
 COMMENT ON TABLE typeform_ingestions IS 'Tracks Typeform form response ingestions';
 COMMENT ON TABLE campaigns IS 'Campaign definitions with trigger configs';
@@ -186,3 +215,4 @@ COMMENT ON TABLE webhooks IS 'Webhook configurations for event-driven campaigns'
 COMMENT ON TABLE webhook_events IS 'Log of received webhook events';
 COMMENT ON TABLE document_uploads IS 'Tracks manually uploaded documents';
 COMMENT ON TABLE integration_settings IS 'Global integration enable/disable and configs';
+COMMENT ON TABLE calendar_events IS 'Tracks meetings booked via Google/Outlook Calendar integrations';

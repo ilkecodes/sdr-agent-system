@@ -25,6 +25,9 @@ from app.typeform_integration import TypeformOAuth, authenticate_typeform, compl
 from app.hubspot_integration import HubSpotOAuth, authenticate_hubspot, complete_hubspot_oauth
 from app.salesforce_integration import SalesforceOAuth, authenticate_salesforce, complete_salesforce_oauth
 from app.campaign_manager import create_campaign, trigger_campaign, get_campaign_stats, CampaignManager
+from app.calendar_manager import CalendarManager, CalendarProvider, quick_book_meeting
+from app.google_calendar_integration import GoogleCalendarOAuth
+from app.outlook_calendar_integration import OutlookCalendarOAuth
 from app.convert import convert_file
 from app.ingest_snippet import ingest_chunks
 
@@ -103,6 +106,28 @@ def dashboard():
                         {% endif %}
                     </td>
                 </tr>
+                <tr>
+                    <td><strong>Google Calendar</strong></td>
+                    <td><span class="status {{ google_calendar_status }}">{{ google_calendar_text }}</span></td>
+                    <td>
+                        {% if google_calendar_status == 'disconnected' %}
+                            <a href="{{ url_for('oauth_google_calendar') }}"><button>Connect</button></a>
+                        {% else %}
+                            <a href="{{ url_for('calendar_dashboard') }}"><button>Manage Calendar</button></a>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Outlook Calendar</strong></td>
+                    <td><span class="status {{ outlook_calendar_status }}">{{ outlook_calendar_text }}</span></td>
+                    <td>
+                        {% if outlook_calendar_status == 'disconnected' %}
+                            <a href="{{ url_for('oauth_outlook_calendar') }}"><button>Connect</button></a>
+                        {% else %}
+                            <a href="{{ url_for('calendar_dashboard') }}"><button>Manage Calendar</button></a>
+                        {% endif %}
+                    </td>
+                </tr>
             </table>
         </div>
         
@@ -140,9 +165,13 @@ def dashboard():
     '''
     
     # Check integration status
-    typeform_token = TypeformOAuth.get_token()
-    hubspot_token = HubSpotOAuth.get_token()
-    salesforce_token = SalesforceOAuth.get_token()
+    user_id = session.get('user_id', 'default_user')  # In production, get from auth
+    
+    typeform_token = TypeformOAuth().get_token(user_id)
+    hubspot_token = HubSpotOAuth().get_token(user_id)
+    salesforce_token = SalesforceOAuth().get_token(user_id)
+    google_calendar_token = GoogleCalendarOAuth().get_token(user_id) if os.getenv('GOOGLE_CLIENT_ID') else None
+    outlook_calendar_token = OutlookCalendarOAuth().get_token(user_id) if os.getenv('OUTLOOK_CLIENT_ID') else None
     
     return render_template_string(template,
         typeform_status='connected' if typeform_token else 'disconnected',
@@ -150,7 +179,11 @@ def dashboard():
         hubspot_status='connected' if hubspot_token else 'disconnected',
         hubspot_text='Connected' if hubspot_token else 'Not Connected',
         salesforce_status='connected' if salesforce_token else 'disconnected',
-        salesforce_text='Connected' if salesforce_token else 'Not Connected'
+        salesforce_text='Connected' if salesforce_token else 'Not Connected',
+        google_calendar_status='connected' if google_calendar_token else 'disconnected',
+        google_calendar_text='Connected' if google_calendar_token else 'Not Connected',
+        outlook_calendar_status='connected' if outlook_calendar_token else 'disconnected',
+        outlook_calendar_text='Connected' if outlook_calendar_token else 'Not Connected'
     )
 
 
@@ -508,6 +541,247 @@ def api_campaigns():
     else:
         campaigns_list = CampaignManager.list_campaigns()
         return jsonify(campaigns_list)
+
+
+# Calendar OAuth Routes
+
+@app.route('/oauth/google_calendar')
+def oauth_google_calendar():
+    """Start Google Calendar OAuth flow."""
+    user_id = session.get('user_id', 'default_user')
+    session['calendar_oauth_user'] = user_id
+    
+    oauth = GoogleCalendarOAuth()
+    auth_url = oauth.get_authorization_url(state=user_id)
+    
+    return redirect(auth_url)
+
+
+@app.route('/oauth/google/callback')
+def oauth_google_callback():
+    """Handle Google Calendar OAuth callback."""
+    code = request.args.get('code')
+    user_id = session.get('calendar_oauth_user', 'default_user')
+    
+    if not code:
+        flash('❌ Authorization failed', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        oauth = GoogleCalendarOAuth()
+        token_data = oauth.exchange_code_for_token(code)
+        oauth.store_token(user_id, token_data)
+        
+        flash('✅ Google Calendar connected successfully!', 'success')
+    except Exception as e:
+        flash(f'❌ Error connecting Google Calendar: {str(e)}', 'error')
+    
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/oauth/outlook_calendar')
+def oauth_outlook_calendar():
+    """Start Outlook Calendar OAuth flow."""
+    user_id = session.get('user_id', 'default_user')
+    session['calendar_oauth_user'] = user_id
+    
+    oauth = OutlookCalendarOAuth()
+    auth_url = oauth.get_authorization_url(state=user_id)
+    
+    return redirect(auth_url)
+
+
+@app.route('/oauth/outlook/callback')
+def oauth_outlook_callback():
+    """Handle Outlook Calendar OAuth callback."""
+    code = request.args.get('code')
+    user_id = session.get('calendar_oauth_user', 'default_user')
+    
+    if not code:
+        flash('❌ Authorization failed', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        oauth = OutlookCalendarOAuth()
+        token_data = oauth.exchange_code_for_token(code)
+        oauth.store_token(user_id, token_data)
+        
+        flash('✅ Outlook Calendar connected successfully!', 'success')
+    except Exception as e:
+        flash(f'❌ Error connecting Outlook Calendar: {str(e)}', 'error')
+    
+    return redirect(url_for('dashboard'))
+
+
+# Calendar Management Routes
+
+@app.route('/calendar')
+def calendar_dashboard():
+    """Calendar dashboard showing availability and upcoming meetings."""
+    user_id = session.get('user_id', 'default_user')
+    
+    template = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Calendar Management</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
+            button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+            button:hover { background: #0056b3; }
+            a { color: #007bff; text-decoration: none; }
+            .slot { padding: 8px; margin: 5px 0; background: #e7f3ff; border-radius: 4px; }
+        </style>
+    </head>
+    <body>
+        <h1>📅 Calendar Management</h1>
+        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        
+        <div class="card">
+            <h2>Calendar Provider</h2>
+            <p><strong>{{ provider }}</strong></p>
+        </div>
+        
+        <div class="card">
+            <h2>Next Available Slots (30 min)</h2>
+            {% if available_slots %}
+                {% for slot in available_slots[:10] %}
+                    <div class="slot">
+                        {{ slot.start.strftime('%A, %B %d at %I:%M %p') }} - {{ slot.end.strftime('%I:%M %p') }}
+                    </div>
+                {% endfor %}
+                {% if available_slots|length > 10 %}
+                    <p><em>... and {{ available_slots|length - 10 }} more slots</em></p>
+                {% endif %}
+            {% else %}
+                <p>No available slots found in the next 7 days</p>
+            {% endif %}
+        </div>
+        
+        <div class="card">
+            <h2>Quick Book Meeting</h2>
+            <form method="POST" action="{{ url_for('quick_book_meeting_route') }}">
+                <label>Customer Email:</label><br>
+                <input type="email" name="customer_email" required style="width: 100%; padding: 8px; margin: 10px 0;"><br>
+                
+                <label>Meeting Title:</label><br>
+                <input type="text" name="title" required style="width: 100%; padding: 8px; margin: 10px 0;"><br>
+                
+                <label>Duration (minutes):</label><br>
+                <select name="duration" style="padding: 8px; margin: 10px 0;">
+                    <option value="15">15 minutes</option>
+                    <option value="30" selected>30 minutes</option>
+                    <option value="45">45 minutes</option>
+                    <option value="60">60 minutes</option>
+                </select><br><br>
+                
+                <label>Description (optional):</label><br>
+                <textarea name="description" style="width: 100%; padding: 8px; margin: 10px 0;" rows="4"></textarea><br>
+                
+                <label>
+                    <input type="checkbox" name="add_conferencing" checked> Add video conferencing link
+                </label><br><br>
+                
+                <button type="submit">Find & Book Next Available Slot</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Upcoming Meetings</h2>
+            {% if upcoming_meetings %}
+                <table>
+                    <tr>
+                        <th>Title</th>
+                        <th>Start Time</th>
+                        <th>Duration</th>
+                        <th>Attendees</th>
+                    </tr>
+                    {% for meeting in upcoming_meetings %}
+                        <tr>
+                            <td>{{ meeting.title }}</td>
+                            <td>{{ meeting.start.strftime('%A, %B %d at %I:%M %p') }}</td>
+                            <td>{{ ((meeting.end - meeting.start).total_seconds() / 60) | int }} min</td>
+                            <td>{{ meeting.attendees | length }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <p>No upcoming meetings</p>
+            {% endif %}
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div style="padding: 10px; margin: 10px 0; background: {% if category == 'error' %}#f8d7da{% else %}#d4edda{% endif %}; border-radius: 4px;">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </body>
+    </html>
+    '''
+    
+    try:
+        manager = CalendarManager(user_id)
+        
+        if not manager.is_authenticated():
+            flash('❌ Calendar not connected. Please connect a calendar first.', 'error')
+            return redirect(url_for('dashboard'))
+        
+        # Get available slots
+        from datetime import datetime, timedelta
+        start = datetime.utcnow()
+        end = start + timedelta(days=7)
+        available_slots = manager.check_availability(start, end, duration_minutes=30)
+        
+        # Get upcoming meetings
+        upcoming_meetings = manager.get_upcoming_meetings(days_ahead=30)
+        
+        return render_template_string(template,
+            provider=manager.get_provider().value,
+            available_slots=available_slots,
+            upcoming_meetings=upcoming_meetings
+        )
+    
+    except Exception as e:
+        flash(f'❌ Error loading calendar: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
+
+
+@app.route('/calendar/quick_book', methods=['POST'])
+def quick_book_meeting_route():
+    """Quick book a meeting."""
+    user_id = session.get('user_id', 'default_user')
+    
+    customer_email = request.form.get('customer_email')
+    title = request.form.get('title')
+    duration = int(request.form.get('duration', 30))
+    description = request.form.get('description')
+    add_conferencing = request.form.get('add_conferencing') == 'on'
+    
+    try:
+        result = quick_book_meeting(
+            user_id=user_id,
+            customer_email=customer_email,
+            title=title,
+            duration_minutes=duration,
+            description=description
+        )
+        
+        if result:
+            flash(f'✅ Meeting booked successfully for {result["start_time"].strftime("%A, %B %d at %I:%M %p")}!', 'success')
+        else:
+            flash('❌ No available slots found in the next 7 days', 'error')
+    
+    except Exception as e:
+        flash(f'❌ Error booking meeting: {str(e)}', 'error')
+    
+    return redirect(url_for('calendar_dashboard'))
 
 
 if __name__ == '__main__':

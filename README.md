@@ -53,10 +53,18 @@ This repository provides a production-ready system where your documentation powe
 - `sql/integrations.sql` — Integration schema (OAuth tokens, CRM sync, campaigns)
 - `examples/integration_workflow.py` — Complete integration examples
 
+### 🆕 Calendar Integrations
+
+- `app/google_calendar_integration.py` — **OAuth 2.0 + real-time availability + meeting booking**
+- `app/outlook_calendar_integration.py` — **OAuth 2.0 + Microsoft Graph + meeting booking**
+- `app/calendar_manager.py` — **Unified calendar interface (provider-agnostic)**
+- `examples/calendar_workflow.py` — Calendar integration examples
+
 📖 See [`docs/KNOWLEDGE_BASE_INTEGRATION.md`](docs/KNOWLEDGE_BASE_INTEGRATION.md) for how KB powers SDR.  
 📖 See [`docs/GEMINI_INTEGRATION.md`](docs/GEMINI_INTEGRATION.md) for Gemini File API setup.  
 📖 See [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) for full SDR agent documentation.  
-📖 See [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) for **CRM integration guide**.
+📖 See [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) for **CRM integration guide**.  
+📖 See [`docs/CALENDAR_INTEGRATIONS.md`](docs/CALENDAR_INTEGRATIONS.md) for **Calendar integration guide**.
 
 ---
 
@@ -113,14 +121,19 @@ export HUBSPOT_CLIENT_ID=your_hubspot_client_id
 export HUBSPOT_CLIENT_SECRET=your_hubspot_secret
 export SALESFORCE_CLIENT_ID=your_salesforce_client_id
 export SALESFORCE_CLIENT_SECRET=your_salesforce_secret
+export GOOGLE_CLIENT_ID=your_google_client_id
+export GOOGLE_CLIENT_SECRET=your_google_secret
+export OUTLOOK_CLIENT_ID=your_outlook_client_id
+export OUTLOOK_CLIENT_SECRET=your_outlook_secret
 export FLASK_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
 
 # 3. Start Admin UI
 python app/admin_ui.py
 # Visit http://localhost:8000 for:
 # - Document uploads to knowledge base
-# - OAuth setup (Typeform, HubSpot, Salesforce)
+# - OAuth setup (Typeform, HubSpot, Salesforce, Google/Outlook Calendar)
 # - Campaign management with CRM triggers
+# - Calendar availability checking and meeting booking
 ```
 
 📖 See [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) for complete integration setup.  
@@ -149,6 +162,7 @@ A GitHub Actions workflow [`.github/workflows/integration.yml`](.github/workflow
 - [`docs/KNOWLEDGE_BASE_INTEGRATION.md`](docs/KNOWLEDGE_BASE_INTEGRATION.md) — How KB powers SDR operations
 - [`docs/SDR_AGENT.md`](docs/SDR_AGENT.md) — Complete SDR agent guide
 - [`docs/CRM_INTEGRATIONS.md`](docs/CRM_INTEGRATIONS.md) — **🆕 Typeform/HubSpot/Salesforce integration guide**
+- [`docs/CALENDAR_INTEGRATIONS.md`](docs/CALENDAR_INTEGRATIONS.md) — **🆕 Google/Outlook Calendar integration guide**
 - [`docs/GEMINI_INTEGRATION.md`](docs/GEMINI_INTEGRATION.md) — Gemini File API setup and usage
 - [`docs/BUILDING_YOUR_KB.md`](docs/BUILDING_YOUR_KB.md) — Step-by-step knowledge base setup
 - [`docs/GEMINI_IMPLEMENTATION.md`](docs/GEMINI_IMPLEMENTATION.md) — Implementation summary
@@ -160,6 +174,7 @@ A GitHub Actions workflow [`.github/workflows/integration.yml`](.github/workflow
 - **Add more knowledge:** Ingest your product docs, case studies, FAQs
 - **Configure agents:** Customize outreach templates and research depth
 - **🆕 Connect CRMs:** Set up Typeform, HubSpot, or Salesforce integrations
+- **🆕 Connect calendars:** Set up Google Calendar or Outlook Calendar for automated meeting booking
 - **🆕 Create campaigns:** Build automated prospect import campaigns with triggers
 - **Integrate Gemini:** Enable multimodal RAG for PDFs with images
 - **Production deployment:** Add secret redaction, monitoring, and rate limiting
