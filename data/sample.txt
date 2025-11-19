@@ -1,0 +1,2 @@
+Hello RAG.
+This is a tiny smoke-test PDF.

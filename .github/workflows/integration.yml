@@ -1,0 +1,66 @@
+name: Integration tests (self-hosted/Docker)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    # Prefer self-hosted runner with Docker; if you run on GitHub-hosted runners ensure Docker is available.
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest sentence-transformers pandas pypdf pgvector
+
+      - name: Start docker-compose
+        run: |
+          docker compose up -d
+
+      - name: Wait for Postgres
+        run: |
+          # Wait up to 60s for Postgres to accept connections
+          python - <<'PY'
+import time, sys, os
+from sqlalchemy import create_engine, text
+url = os.getenv('DATABASE_URL','postgresql+psycopg://rag:ragpw@localhost:5433/ragdb')
+e = create_engine(url)
+deadline = time.time() + 60
+while time.time() < deadline:
+    try:
+        with e.connect() as c:
+            c.execute(text('SELECT 1'))
+            print('db ok')
+            sys.exit(0)
+    except Exception:
+        time.sleep(1)
+print('db not ready', file=sys.stderr); sys.exit(2)
+PY
+
+      - name: Run integration test
+        env:
+          DATABASE_URL: postgresql+psycopg://rag:ragpw@localhost:5433/ragdb
+        run: |
+          . .venv/bin/activate
+          PYTHONPATH=. .venv/bin/pytest -q tests/test_integration.py::test_full_flow -q
+
+      - name: Teardown docker-compose
+        if: always()
+        run: |
+          docker compose down

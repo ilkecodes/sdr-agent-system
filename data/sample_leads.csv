@@ -1,0 +1,6 @@
+email,first_name,last_name,company_name,company_domain,job_title,industry,company_size,linkedin_url
+sarah.chen@techcorp.com,Sarah,Chen,TechCorp,techcorp.com,VP of Sales,SaaS,201-500,https://linkedin.com/in/sarahchen
+mike.johnson@cloudify.io,Mike,Johnson,Cloudify,cloudify.io,Director of Marketing,Technology,51-200,https://linkedin.com/in/mikejohnson
+lisa.wang@enterprise.com,Lisa,Wang,Enterprise Solutions,enterprise.com,Chief Technology Officer,Software,1001-5000,https://linkedin.com/in/lisawang
+david.kim@startup.ai,David,Kim,Startup AI,startup.ai,Head of Growth,SaaS,11-50,https://linkedin.com/in/davidkim
+emma.rodriguez@fintech.co,Emma,Rodriguez,FinTech Inc,fintech.co,VP of Product,FinTech,201-500,https://linkedin.com/in/emmarodriguez
